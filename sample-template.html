@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head><meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/></head>
+<body>
+<form name='form' method='post' action="{{ path }}">
+    <p>What city is this attraction in?</p>
+    <p><a href="{{ url }}" target="_judgement">View site (opens in new tab)</a></p>
+    <table cellspacing="4" cellpadding="0" border="0">
+        <tbody>
+            <tr>
+                <td valign="center"><label for="geographical_Choice0">San Francisco, CA</label></td>
+                <td><input type="radio" name="geographical" id="geographical_Choice0" value="Choice0" {% if geographical == "Choice0" %}checked="checked"{% endif %} /></td>
+            </tr>
+            <tr>
+                <td valign="center"><label for="geographical_Choice1">Other (Enter city name)</label></td>
+                <td><input type="radio" name="geographical" id="geographical_Choice1" value="Choice1" {% if geographical == "Choice1" %}checked="checked"{% endif %} /></td>
+            </tr>
+        </tbody>
+    </table>
+    <p><input type="submit" id="submit" value="Submit"></p>
+</form>
+</body>
+</html>
