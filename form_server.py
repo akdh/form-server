@@ -5,6 +5,7 @@ import json
 from jinja2 import Template
 import argparse
 from random import choice
+import uuid
 
 index_template = """<!DOCTYPE html>
 <html>
@@ -66,8 +67,8 @@ def item(username, id):
 	if request.method == "POST":
 		count = g.db.execute("SELECT COUNT(*) FROM results WHERE key = ?", (id,)).fetchone()[0]
 		d = request.form.to_dict()
-		d["id"] = id
 		d["username"] = username
+		d.update(json.loads(row[0]))
 		if count == 0:
 			g.db.execute("INSERT INTO results (key, value, author) VALUES (?, ?, ?)", (id, json.dumps(d), username))
 		else:
@@ -90,23 +91,31 @@ parser = argparse.ArgumentParser()
 
 subparsers = parser.add_subparsers(help="command", dest="command")
 
-input_subparser = subparsers.add_parser("input", help="input questions into server")
-input_subparser.add_argument("csv", action="store")
-input_subparser.add_argument("id", action="store")
-
 results_subparser = subparsers.add_parser("results", help="get results")
 results_subparser.add_argument("csv", action="store")
 
 results_subparser = subparsers.add_parser("run", help="run the server")
 results_subparser.add_argument("html", action="store")
 
-parser.add_argument("db", action="store", help="location of sqlite DB file")
+parser.add_argument("--input", action="store", help="input questions into DB")
+parser.add_argument("--db", action="store", default="db.sqlite", help="location of sqlite DB file (default: db.sqlite)")
 
 args = parser.parse_args()
 
+if not args.input is None:
+	db = sqlite3.connect(args.db)
+	db.execute("DROP TABLE IF EXISTS input")
+	db.execute("CREATE TABLE input (key, value)")
+	db.execute("CREATE TABLE IF NOT EXISTS results (key, value, author)")
+	with open(args.input, "rb") as file:
+		rows = csv.DictReader(file, delimiter="\t")
+		for row in rows:
+			db.execute("INSERT INTO input (key, value) VALUES (?, ?)", (str(uuid.uuid4()), json.dumps(row)))
+	db.commit()
+	db.close()
+
 if args.command == "run":
 	app.secret_key = "\xaa\nJE\xf6\xab\xa2\x15\xd2{ETN'\xce\xcd\x97\xb8\xf4\xae3\x92\x19)"
-	app.debug = True
 	app.config['DB_NAME'] = args.db
 	try:
 		with open(args.html, "r") as file:
@@ -115,23 +124,14 @@ if args.command == "run":
 		exit("No such file %s" % args.html)
 	app.config['HTML'] = source
 	app.run()
-elif args.command == "input":
-	db = sqlite3.connect(args.db)
-	db.execute("DROP TABLE IF EXISTS input")
-	db.execute("CREATE TABLE input (key, value)")
-	db.execute("CREATE TABLE IF NOT EXISTS results (key, value, author)")
-	with open(args.csv, "rb") as file:
-		rows = csv.DictReader(file, delimiter="\t")
-		for row in rows:
-			id = Template(args.id).render(**row)
-			db.execute("INSERT INTO input (key, value) VALUES (?, ?)", (id, json.dumps(row)))
-	db.commit()
-	db.close()
 elif args.command == "results":
 	db = sqlite3.connect(args.db)
 	rows = db.execute("SELECT value FROM results").fetchall()
 	if len(rows) > 0:
-		fieldnames = json.loads(rows[0][0]).keys()
+		s = set()
+		for row in rows:
+			s.update(json.loads(row[0]).keys())
+		fieldnames = list(s)
 		with open(args.csv, "wb") as file:
 			writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter="\t")
 			writer.writeheader()
